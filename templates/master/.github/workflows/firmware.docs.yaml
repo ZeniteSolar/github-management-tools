@@ -1,0 +1,78 @@
+name: firmware.docs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+    paths:
+    - 'firmware/**'
+    - '.config/**'
+    - '.github/**'
+
+jobs:
+  Docs:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+
+    # GET DEPENDENCIES
+    - name: Install dependencies
+      run: sudo apt-get install -y doxygen
+    - run: doxygen --version
+
+    # BUILD
+    - name: Build docs
+      run: |
+        cd firmware
+        mkdir -p docs/xml docs/md
+        doxygen Doxyfile
+        npx moxygen --templates=docs/templates --groups --classes --output=docs/md/%s.md docs/xml
+
+    # UPLOAD
+    - name: Upload Docs
+      uses: actions/upload-artifact@v2.1.4
+      with:
+        name: Docs
+        path: firmware/docs/md
+
+  Publish:
+    runs-on: ubuntu-latest
+    needs: Docs
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: 'gh-pages'
+
+    # CLEAN
+    - run: rm -rf ./firmware
+
+    # DOWNLOAD ARTIFACT
+    - name: Download Docs
+      uses: actions/download-artifact@v2.0.5
+      with:
+        name: Docs
+        path: ./firmware
+
+    # CREATE CONTENT
+    - name: Create Content
+      run: ./create_content.sh
+
+    # PUBLISH
+    - name: Publish Firmware Docs
+      uses: peaceiris/actions-gh-pages@v3.7.0-8
+      if: ${{ always() }}
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: gh-pages
+        publish_dir: ./
+        enable_jekyll: true
+        force_orphan: false
+        keep_files: false
+        commit_message: ${{ github.event.head_commit.message  }}
+        #user_name: 'github-actions[bot]'
+        #user_email: 'actions[bot]@users.noreply.github.com'
+        destination_dir: ./

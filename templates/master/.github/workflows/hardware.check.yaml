@@ -1,0 +1,49 @@
+name: hardware.check
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+    paths:
+    - 'hardware/**'
+    - '.config/**'
+    - '.github/**'
+  pull_request:
+    branches: [ master ]
+    paths:
+    - 'hardware/**'
+    - '.config/**'
+    - '.github/**'
+
+jobs:
+  ERC:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+
+    # RUN
+    - name: kicad-exports erc
+      uses: nerdyscout/kicad-exports@v2.0
+      with:
+        config: ./.config/erc.kiplot.yaml
+        dir: hardware
+        board: hardware/@REPOSITORY_NAME@.kicad_pcb
+        schema: hardware/@REPOSITORY_NAME@.sch
+
+  DRC:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+
+    # RUN
+    - name: kicad-exports drc
+      uses: nerdyscout/kicad-exports@v2.0
+      with:
+        config: ./.config/drc.kiplot.yaml
+        dir: hardware
+        board: hardware/@REPOSITORY_NAME@.kicad_pcb
+        schema: hardware/@REPOSITORY_NAME@.sch

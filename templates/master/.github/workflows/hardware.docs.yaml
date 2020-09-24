@@ -1,0 +1,239 @@
+name: hardware.docs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+    paths:
+    - 'hardware/**'
+    - '.config/**'
+    - '.github/**'
+
+jobs:
+  Schematics:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+
+    # RUN
+    - name: kicad-exports schematics
+      uses: nerdyscout/kicad-exports@v2.0
+      with:
+        config: ./.config/schematics.kiplot.yaml
+        dir: hardware/docs
+        board: hardware/@REPOSITORY_NAME@.kicad_pcb
+        schema: hardware/@REPOSITORY_NAME@.sch
+
+    # CHECK
+    - name: "check output: schematics"
+      run: |
+        test -f hardware/docs/@REPOSITORY_NAME@-Schematic*.svg && \
+        test -f hardware/docs/@REPOSITORY_NAME@-Schematic*.pdf && \
+        test -f hardware/docs/@REPOSITORY_NAME@-Board*.pdf
+
+    # UPLOAD
+    - name: Upload Schematics
+      uses: actions/upload-artifact@v2.1.4
+      with:
+        name: schematics
+        path: hardware/docs
+
+  Bom:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+    # RUN
+    - name: kicad-exports bom
+      uses: nerdyscout/kicad-exports@v2.0
+      with:
+        config: ./.config/bom.kiplot.yaml
+        dir: hardware/docs/bom
+        board: hardware/@REPOSITORY_NAME@.kicad_pcb
+        schema: hardware/@REPOSITORY_NAME@.sch
+
+    # CHECK
+    - name: "check output: bom"
+      run: |
+        test -f hardware/docs/bom/@REPOSITORY_NAME@-interactive-bom.html && \
+        test -f hardware/docs/bom/@REPOSITORY_NAME@-bom.html && \
+        test -f hardware/docs/bom/@REPOSITORY_NAME@-bom.csv && \
+        test -f hardware/docs/bom/@REPOSITORY_NAME@-bom.xlsx
+
+    # UPLOAD
+    - name: Upload Bom
+      uses: actions/upload-artifact@v2.1.4
+      with:
+        name: bom
+        path: hardware/docs/bom
+
+  Plot:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+
+    # RUN
+    - name: kicad-exports plot
+      uses: nerdyscout/kicad-exports@v2.0
+      with:
+        config: ./.config/plot.kiplot.yaml
+        dir: hardware/docs/imgs
+        schema: hardware/@REPOSITORY_NAME@.sch
+        board: hardware/@REPOSITORY_NAME@.kicad_pcb
+
+    # CHECK
+    - name: "check output: plot"
+      run: |
+        test -f hardware/docs/imgs/@REPOSITORY_NAME@-top.svg && \
+        test -f hardware/docs/imgs/@REPOSITORY_NAME@-bottom.svg
+
+    # UPLOAD
+    - name: Upload Plot
+      uses: actions/upload-artifact@v2.1.4
+      with:
+        name: plot
+        path: hardware/docs/imgs
+
+  Model:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+
+    # RUN
+    - name: kicad-exports model
+      uses: nerdyscout/kicad-exports@v2.0
+      with:
+        config: ./.config/model.kiplot.yaml
+        dir: hardware/docs/cad
+        schema: hardware/@REPOSITORY_NAME@.sch
+        board: hardware/@REPOSITORY_NAME@.kicad_pcb
+
+    # CHECK
+    - name: "check output: model"
+      run: |
+        test -f hardware/docs/cad/@REPOSITORY_NAME@.step
+
+    # UPLOAD
+    - name: Upload Model
+      uses: actions/upload-artifact@v2.1.4
+      with:
+        name: model
+        path: hardware/docs/cad
+
+  Gerbers:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+
+    # RUN
+    - name: kicad-exports gerbers
+      uses: nerdyscout/kicad-exports@v2.0
+      with:
+        config: ./.config/gerbers.kiplot.yaml
+        dir: hardware/docs/gerbers
+        board: hardware/@REPOSITORY_NAME@.kicad_pcb
+        schema: hardware/@REPOSITORY_NAME@.sch
+
+    # CHECK
+    - name: "check output: fabrications"
+      run: |
+        test -f hardware/docs/gerbers/*B_CrtYd.gbr && \
+        test -f hardware/docs/gerbers/*F_CrtYd.gbr && \
+        test -f hardware/docs/gerbers/*B_Cu.gbr && \
+        test -f hardware/docs/gerbers/*F_Cu.gbr && \
+        test -f hardware/docs/gerbers/*B_Mask.gbr && \
+        test -f hardware/docs/gerbers/*F_Mask.gbr && \
+        test -f hardware/docs/gerbers/*B_Paste.gbr && \
+        test -f hardware/docs/gerbers/*F_Paste.gbr && \
+        test -f hardware/docs/gerbers/*B_SilkS.gbr && \
+        test -f hardware/docs/gerbers/*F_SilkS.gbr && \
+        test -f hardware/docs/gerbers/*B_CrtYd.gbr && \
+        test -f hardware/docs/gerbers/*F_CrtYd.gbr && \
+        test -f hardware/docs/gerbers/*NPTH*.gbr && \
+        test -f hardware/docs/gerbers/*NPTH*.drl && \
+        test -f hardware/docs/gerbers/*-PTH*.gbr && \
+        test -f hardware/docs/gerbers/*-PTH*.drl && \
+        test -f hardware/docs/gerbers/*_pos.csv
+
+    # UPLOAD
+    - name: Upload Gerbers
+      uses: actions/upload-artifact@v2.1.4
+      with:
+        name: gerbers
+        path: hardware/docs/gerbers
+
+  Publish:
+    runs-on: ubuntu-latest
+    needs: [Schematics, Bom, Plot, Model]
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: 'gh-pages'
+
+    # CLEAN
+    - run: rm -rf ./hardware
+
+    # DOWNLOAD ARTIFACTS
+    - name: Download Schematics
+      uses: actions/download-artifact@v2.0.5
+      if: ${{ always() }}
+      with:
+        name: schematics
+        path: hardware/schematics
+    - name: Download Bom
+      uses: actions/download-artifact@v2.0.5
+      if: ${{ always() }}
+      with:
+        name: bom
+        path: hardware/bom
+    - name: Download Plot
+      uses: actions/download-artifact@v2.0.5
+      if: ${{ always() }}
+      with:
+        name: plot
+        path: hardware/layout
+    - name: Download Model
+      uses: actions/download-artifact@v2.0.5
+      if: ${{ always() }}
+      with:
+        name: model
+        path: hardware/cad
+    - name: Download Gerbers
+      uses: actions/download-artifact@v2.0.5
+      if: ${{ always() }}
+      with:
+        name: gerbers
+        path: hardware/gerbers
+
+    # CREATE CONTENT
+    - name: Create Content
+      run: ./create_content.sh
+
+    # PUBLISH
+    - name: Publish Hardware Docs
+      uses: peaceiris/actions-gh-pages@v3.7.0-8
+      if: ${{ always() }}
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: gh-pages
+        publish_dir: ./
+        enable_jekyll: true
+        force_orphan: false
+        keep_files: false
+        commit_message: ${{ github.event.head_commit.message  }}
+        #user_name: 'github-actions[bot]'
+        #user_email: 'actions[bot]@users.noreply.github.com'
+        destination_dir: ./
